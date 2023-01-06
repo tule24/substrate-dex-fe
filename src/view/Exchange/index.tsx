@@ -7,7 +7,7 @@ function Homepage() {
   const {accountInfo, api} = useSelector((state: AppState) => state.account);
   return (
     <div className='flex w-full h-full'>
-      <Trade.TradeBook curTradepair={curTradepair} curTPInfo={curTPInfo} buyItems={buyItems} sellItems={sellItems} trades={trades} accountOrders={accountOrders}/>
+      <Trade.TradeBook curTradepair={curTradepair} curAccount={accountInfo.curAccount} api={api} curTPInfo={curTPInfo} buyItems={buyItems} sellItems={sellItems} trades={trades} accountOrders={accountOrders}/>
       <Trade.TradeOrder curTradepair={curTradepair} curAccount={accountInfo.curAccount} api={api}/>
     </div>
   )

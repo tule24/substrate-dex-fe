@@ -12,7 +12,6 @@ function CreateTradepair(props: any) {
 
     const handleInput = (e: any) => {
         const { name, value } = e.target;
-        console.log(value)
         setInput({ ...input, [name]: value })
     }
 

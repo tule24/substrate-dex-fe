@@ -1,6 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { Order, PriceItem, TokenInfo, Trade, TradePair, TradeState } from '../types'
-
 const initialState: TradeState = {
     tokens: [],
     tradePairs: [],
@@ -8,6 +7,7 @@ const initialState: TradeState = {
     sellItems: [],
     trades: [],
     accountOrders: [],
+    accountBalance: [],
     curTradepair: null,
     curTPInfo: null
 }
@@ -70,15 +70,15 @@ export const tradeSlice = createSlice({
             state.curTPInfo = { latestMatchedPrice, oneDayTradeVolume, oneDayHighestPrice, oneDayLowestPrice }
         },
         addBuyItems: (state, action: PayloadAction<Array<PriceItem>>) => {
-            console.log(action.payload)
             state.buyItems = action.payload;
         },
         addSellItems: (state, action: PayloadAction<Array<PriceItem>>) => {
-            console.log(action.payload)
             state.sellItems = action.payload;
         },
         addTrade: (state, action: PayloadAction<Trade>) => {
-            state.trades.unshift(action.payload)
+            if (!state.trades.find(trade => trade.hash_ === action.payload.hash_)) {
+                state.trades.unshift(action.payload)
+            }
         },
         addAccountOrder: (state, action: PayloadAction<any>) => {
             const order = action.payload;
@@ -91,27 +91,44 @@ export const tradeSlice = createSlice({
                     state.accountOrders.unshift({...order, tradePair}) 
                 }
             }
+        },
+        cancleAccountOrder: (state, action: PayloadAction<string>) => {
+            const index = state.accountOrders.findIndex(o => o.hash === action.payload);
+            if (index !== -1) {
+                state.accountOrders[index].status = 'Canceled'
+            }
+        },
+        setBalance: (state, action: PayloadAction<Array<any>>) => {
+            const res = action.payload.map((ele: any) => {
+                const token = state.tokens.find(token => token.hash_ === ele.token);
+                return {...ele, token}
+            })
+            state.accountBalance = res
         }
     }
 });
 
-export const { initToken, initTradepair, initTrade, initAccountOrder, addTradepair, addToken, addBuyItems, addSellItems, addTrade, addAccountOrder, changeCurTradepair, updateInfo } = tradeSlice.actions;
+export const { initToken, initTradepair, initTrade, initAccountOrder, addTradepair, addToken, addBuyItems, addSellItems, addTrade, addAccountOrder, cancleAccountOrder, changeCurTradepair, updateInfo, setBalance } = tradeSlice.actions;
 export default tradeSlice.reducer;
 
 // Thunk
 export const getDataOnStart = (api: any) => async (dispatch: any) => {
-    if (api) {
-        let tokens = await api.query.tokens.tokens.entries();
-        tokens = tokens.map(([key, val]: any) => {
-            return val.toHuman()
-        })
-        dispatch(initToken(tokens))
-
-        let tradePairs = await api.query.trade.tradePairs.entries();
-        tradePairs = tradePairs.map(([key, val]: any) => {
-            return val.toHuman()
-        })
-        dispatch(initTradepair(tradePairs))
+    try {
+        if (api) {
+            let tokens = await api.query.tokens.tokens.entries();
+            tokens = tokens.map(([key, val]: any) => {
+                return val.toHuman()
+            })
+            dispatch(initToken(tokens))
+    
+            let tradePairs = await api.query.trade.tradePairs.entries();
+            tradePairs = tradePairs.map(([key, val]: any) => {
+                return val.toHuman()
+            })
+            dispatch(initTradepair(tradePairs))
+        }
+    } catch(err) {
+        console.log(err)
     }
 }
 export const getToken = (api: any, hash: String) => async (dispatch: any) => {
@@ -132,7 +149,6 @@ export const getAllPrice = (api: any, tpHash: string) => async (dispatch: any) =
                                  .filter((item: any) => item.buyAmount !== 0)
                                  .sort((a: any, b: any) => a.price - b.price)
             const index = priceList.findIndex((item: any) => item.next === null)
-            // console.log(index)
             const buyItems = priceList.slice(0, index + 1);
             const sellItems = priceList.slice(index + 1);
 
@@ -206,7 +222,7 @@ export const getAllAccountOrder = (api: any, accountId: string) => async (dispat
             let order = [];
             for (let i = 0; i < orders.length; i++) {
                 const res = await api.query.trade.orders(orders[i].hash);
-                order.push(res.toJSON())
+                order.unshift(res.toJSON())
             }
             dispatch(initAccountOrder(order))
         }
@@ -214,3 +230,30 @@ export const getAllAccountOrder = (api: any, accountId: string) => async (dispat
         console.log(err)
     }
 }
+export const cancelOrder = (api: any, orderHash: string, curTradepair: TradePair) => async (dispatch: any) => {
+    try {
+        if(api) {
+            let order = await api.query.trade.orders(orderHash)
+            order = order.toHuman()
+            if (order.base === curTradepair?.base.hash_ && order.quote === curTradepair?.quote.hash_) {
+                dispatch(getAllPrice(api, curTradepair.hash_))
+            }
+        }
+    } catch (err) {
+        console.log(err)
+    }
+}
+export const getBalance = (api: any, accountId: string) => async (dispatch: any) => {
+    try {
+        if(api) {
+            let balance = await api.query.tokens.balanceOf.entries(accountId);
+            balance = balance.map(([key, val]: any) => {
+                return {token: key.toHuman()[1], bal: val.toHuman()}
+            })
+            dispatch(setBalance(balance))
+        }
+    } catch(err) {
+        console.log(err)
+    }
+}
+

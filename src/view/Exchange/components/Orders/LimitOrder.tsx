@@ -1,5 +1,6 @@
 import { web3FromAddress } from '@polkadot/extension-dapp';
 import React, { useState } from 'react'
+import openNotification from '../../../utils/Notification';
 
 function LimitOrder(props: any) {
     const { otype, curTradepair, curAccount, api } = props;
@@ -21,28 +22,33 @@ function LimitOrder(props: any) {
         if (curAccount && curTradepair && price > 0 && sellAmount > 0) {
             const address = curAccount.address;
             const injector = await web3FromAddress(address)
-            const events = new Promise(async (resolve, reject) => {
-                await api.tx.trade
-                    .createOrder(curTradepair.base.hash_, curTradepair.quote.hash_, 'Limit', otype, price, sellAmount)
-                    .signAndSend(
-                        address,
-                        { signer: injector?.signer },
-                        ({ status, events, dispatchError }: any) => {
-                            if (dispatchError) {
-                                if (dispatchError.isModule) {
-                                    const decoded = api.registry.findMetaError(dispatchError.asModule);
-                                    const { name, section } = decoded;
-                                    const res = 'Error'.concat(':', section, '.', name);
-                                    resolve(res);
-                                } else {
-                                    resolve(dispatchError.toString());
+            try {
+                const events = async () => {
+                    await api.tx.trade
+                        .createOrder(curTradepair.base.hash_, curTradepair.quote.hash_, 'Limit', otype, price, sellAmount)
+                        .signAndSend(
+                            address,
+                            { signer: injector?.signer },
+                            ({ status, events, dispatchError }: any) => {
+                                if (dispatchError) {
+                                    if (dispatchError.isModule) {
+                                        const decoded = api.registry.findMetaError(dispatchError.asModule);
+                                        const { name, section } = decoded;
+                                        const err = 'Error'.concat(':', section, '.', name);
+                                        throw new Error(err)
+                                    } else {
+                                        throw new Error(dispatchError.toString());
+                                    }
                                 }
                             }
-                        }
-                    )
-            })
-            console.log(await events)
-            setInput({ price: 0, amount: 0 })
+                        )
+                }
+                await events();
+                openNotification('success', 'Create Order Success', '')
+            } catch (err) {
+                console.log(err)
+                openNotification('warning', 'Create Order Failed', '')
+            }
         }
     }
 

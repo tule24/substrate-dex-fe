@@ -2,7 +2,7 @@ import { ApiPromise, WsProvider } from '@polkadot/api';
 import { web3Accounts, web3Enable, web3FromSource } from '@polkadot/extension-dapp'
 import { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 
-const WS_PROVIDER = "ws://127.0.0.1:9944";
+const WS_PROVIDER = "ws://222.252.31.175:4000";
 let api: ApiPromise;
 
 export async function getApi() {

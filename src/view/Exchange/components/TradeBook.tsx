@@ -1,8 +1,44 @@
+import { web3FromAddress } from '@polkadot/extension-dapp';
 import React from 'react'
 import { Order, PriceItem, Trade } from '../../../store/types';
+import openNotification from '../../utils/Notification';
 
 function TradeBook(props: any) {
-    const { curTradepair, curTPInfo, buyItems, sellItems, trades, accountOrders } = props;
+    const { curTradepair, curAccount, curTPInfo, buyItems, sellItems, trades, accountOrders, api } = props;
+
+    const cancelOrder = async (orderHash: string) => {
+        if (curAccount && curTradepair) {
+            const address = curAccount.address;
+            const injector = await web3FromAddress(address)
+            try {
+                const events = async () => {
+                    await api.tx.trade
+                        .cancelLimitOrder(orderHash)
+                        .signAndSend(
+                            address,
+                            { signer: injector?.signer },
+                            ({ status, events, dispatchError }: any) => {
+                                if (dispatchError) {
+                                    if (dispatchError.isModule) {
+                                        const decoded = api.registry.findMetaError(dispatchError.asModule);
+                                        const { name, section } = decoded;
+                                        const err = 'Error'.concat(':', section, '.', name);
+                                        throw new Error(err)
+                                    } else {
+                                        throw new Error(dispatchError.toString());
+                                    }
+                                }
+                            }
+                        )
+                }
+                await events();
+                openNotification('success', 'Cancel Order Success', '')
+            } catch (err) {
+                console.log(err)
+                openNotification('warning', 'Cancel Order Failed', '')
+            }
+        }
+    }
     return (
         <div className=' flex-grow'>
             <div className=' flex text-white justify-between py-5 px-10 text-lg border-b border-violet-500'>
@@ -103,7 +139,7 @@ function TradeBook(props: any) {
                     </div>
                     <div className='border-t border-gray-500'>
                         <div className="overflow-x-auto">
-                            <p className=' text-white font-bold text-lg mb-1 ml-2'>Trade history</p>
+                            <p className=' text-white font-bold text-lg mb-1 ml-2 text-center'>Order history</p>
                             <table className="min-w-full text-xs">
                                 <colgroup>
                                     <col />
@@ -117,13 +153,12 @@ function TradeBook(props: any) {
                                         <th className="p-2">TRADEPAIR</th>
                                         <th className="p-2">PRICE</th>
                                         <th className="p-2">AMOUNT</th>
-                                        <th className="p-2">TOTAL</th>
                                         <th className="p-2">STATUS</th>
+                                        <th className="p-2">ACTION</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {accountOrders.map((order: Order, index: number) => {
-                                        console.log(order)
                                         return (
                                             <tr className=" text-white text-center hover:bg-gray-500 hover:bg-opacity-50" key={index}>
                                                 <td className="p-3">
@@ -132,18 +167,25 @@ function TradeBook(props: any) {
                                                     </span>
                                                 </td>
                                                 <td className="p-3">
-                                                    <p className={`text-${order.otype === 'Buy' ? 'green' : 'red'}-500 font-semibold text-base`}>{order.price / 10 ** 8}</p>
+                                                    <p className={`text-${order.otype === 'Buy' ? 'green' : 'red'}-500 font-semibold text-base`}>{order.price / 10 ** 8}$</p>
                                                 </td>
                                                 <td className="p-3">
                                                     <p className='text-gray-200 font-semibold text-base'>{order.otype === 'Buy' ? order.buyAmount : order.sellAmount}</p>
                                                 </td>
-                                                <td className="p-3">
-                                                    <p className='text-gray-200 font-semibold text-base'>{order.otype === 'Buy' ? order.sellAmount : order.buyAmount}</p>
+                                                <td className='p-3'>
+                                                    <span className={`text-xs inline-block py-1 px-2 rounded bg-violet-800 uppercase last:mr-0 mr-1 tracking-wider`}>
+                                                        {order.status === 'Created' ? 'Not Filled' : order.status}
+                                                    </span>
                                                 </td>
                                                 <td className="p-3">
-                                                    <span className={`text-xs font-bold inline-block py-1 px-2 rounded text-violet-500 uppercase last:mr-0 mr-1`}>
-                                                        {order.status === 'Created' ? 'NotFilled' : order.status}
-                                                    </span>
+                                                    {order.status === 'Created'
+                                                        && <button
+                                                            className={`text-xs font-bold inline-block py-1 px-2 rounded bg-slate-600 hover:bg-slate-200  text-black uppercase last:mr-0 mr-1`}
+                                                            onClick={() => cancelOrder(order.hash)}
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                    }
                                                 </td>
                                             </tr>
                                         )

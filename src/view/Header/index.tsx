@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import Dropdown from './components/TPDropdown'
+import * as Dropdown from './components'
 import { useDispatch, useSelector } from 'react-redux'
 import { AppDispatch, AppState } from '../../store'
 import { setAccountInfo, setApi } from '../../store/reducers/account.reducer'
 import { getApi, getWallet, getExtension } from '../../utils/util'
 import openNotification from '../utils/Notification'
-import { addAccountOrder, addTradepair, getAllAccountOrder, getAllPrice, getDataOnStart, getToken, getTrade } from '../../store/reducers/trade.reducer'
+import { addAccountOrder, addTradepair, cancelOrder, cancleAccountOrder, getAllAccountOrder, getAllPrice, getBalance, getDataOnStart, getToken, getTrade } from '../../store/reducers/trade.reducer'
 
 function Header() {
   let activeStyle = { borderBottom: '2px solid darkblue', color: 'darkblue' };
   const dispatch = useDispatch<AppDispatch>();
   const { curAccount, web3enable } = useSelector((state: AppState) => state.account.accountInfo);
-  const { tradePairs, curTradepair } = useSelector((state: AppState) => state.trade);
+  const { tradePairs, curTradepair, accountBalance } = useSelector((state: AppState) => state.trade);
   const { api } = useSelector((state: AppState) => state.account);
 
 
@@ -45,6 +45,12 @@ function Header() {
             const { tokenHash } = event.data.toHuman()
             dispatch(getToken(api, tokenHash))
           }
+          else if (event.method.toString() === 'Transferred') {
+            const {from, to} = event.data.toHuman()
+            if (curAccount && (from === curAccount.address || to === curAccount.address)) {
+              dispatch(getBalance(api, curAccount.address))
+            }
+          }
         } else if (event.section.toString() === 'trade') {
           if (event.method.toString() === 'TradePairCreated') {
             const { tradePair } = event.data.toHuman()
@@ -67,9 +73,13 @@ function Header() {
               dispatch(getTrade(api, curTradepair.hash_, trade, curAccount.address))
             }
           }
-          // else if (event.method.toString() === 'OrderCanceled') {
-          //   const {orderHash} = event.data.toHuman()
-          // }
+          else if (event.method.toString() === 'OrderCanceled') {
+            const {owner, orderHash} = event.data.toHuman()
+            if (curAccount && owner === curAccount.address) {
+              dispatch(cancleAccountOrder(orderHash))
+            }
+            curTradepair && dispatch(cancelOrder(api, orderHash, curTradepair))
+          }
         }
       });
     })
@@ -92,6 +102,7 @@ function Header() {
 
   useEffect(() => {
     curAccount && dispatch(getAllAccountOrder(api, curAccount.address))
+    curAccount && dispatch(getBalance(api, curAccount.address))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [curAccount])
 
@@ -100,7 +111,7 @@ function Header() {
       <header className=" text-white body-font bg-violet-500">
         <div className="container mx-auto flex flex-wrap p-5 flex-col md:flex-row items-center">
           <span className=' text-4xl font-bold'>DEX</span>
-          <div className='ml-10'><Dropdown tradePairs={tradePairs} curTradepair={curTradepair} api={api} /></div>
+          <div className='ml-10'><Dropdown.Tradepair tradePairs={tradePairs} curTradepair={curTradepair} api={api} /></div>
           <nav className="md:ml-auto flex flex-wrap items-center text-base justify-center">
             <NavLink className="mr-5 hover:text-gray-900 font-semibold text-xl" to='exchange' style={({ isActive }) => isActive ? activeStyle : undefined}>Exchange</NavLink>
             <NavLink className="mr-5 hover:text-gray-900 font-semibold text-xl" to='admin' style={({ isActive }) => isActive ? activeStyle : undefined}>Admin</NavLink>
@@ -113,6 +124,7 @@ function Header() {
             {curAccount ? curAccount.address.slice(0, 4) + '...' + curAccount.address.slice(curAccount.address.length - 3, curAccount.address.length) : 'Connect Wallet'}
             <i className="fa-solid fa-wallet ml-2"></i>
           </button>
+          <div className='ml-5'><Dropdown.Wallet accountBalance={accountBalance} curAccount={curAccount}/></div>
         </div>
       </header>
     </>

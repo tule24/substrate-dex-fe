@@ -75,6 +75,7 @@ export interface TradeState {
     sellItems: Array<PriceItem>,
     trades: Array<Trade>,
     accountOrders: Array<Order>,
+    accountBalance: Array<any>,
     curTradepair: TradePair | null,
     curTPInfo: TPInfo | null
 }
